@@ -1,0 +1,3 @@
+include moss/*
+include moss/shaders/*
+include moss/res/*

@@ -1,0 +1,9 @@
+pyglm
+pyglet
+pysdl2
+pysdl2-dll
+pillow
+glfw
+rsxpy
+rvr
+imgui
