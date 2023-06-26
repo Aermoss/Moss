@@ -1,52 +1,58 @@
-import os, sys, moss, glm, time, rvr, ctypes, math
+import sys
+
+sys.path.append("../../")
+
+import os, moss, glm, time, rvr, ctypes, math
 import pyglet.gl as gl
 
-window = moss.Window("VR Test", 1200, 600, moss.Color(0, 0, 0), False, 1)
-mixer = moss.Mixer()
+def setup(window):
+    global mixer, near, far, position, shader, basicShader, light, model, deagle_sound, \
+        barrel_pos, gun_std_pos, gun_std_rot, gun_pos, gun_rot, state, mesh
 
-near, far = 0.1, 100.0
+    mixer = moss.Mixer()
 
-position = glm.vec3(0.0, 0.0, 0.0)
+    near, far = 0.1, 100.0
 
-shader = moss.Shader(
-    moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/default.vert")),
-    moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/default.frag"))
-)
+    position = glm.vec3(0.0, 0.0, 0.0)
 
-lightShader = moss.Shader(
-    moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/light.vert")),
-    moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/light.frag"))
-)
+    shader = moss.Shader(
+        moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/default.vert")),
+        moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/default.frag"))
+    )
 
-light = moss.Model(
-    shader = lightShader,
-    filePath = os.path.join(os.path.split(moss.__file__)[0], "res/cube.obj")
-)
+    basicShader = moss.Shader(
+        moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/default.vert")),
+        moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/basic.frag"))
+    )
 
-light.transform.position = glm.vec3(5.0, 5.0, 5.0)
-light.transform.scaleVector = glm.vec3(0.1, 0.1, 0.1)
+    light = moss.Model(
+        shader = basicShader,
+        filePath = os.path.join(os.path.split(moss.__file__)[0], "res/cube.obj")
+    )
 
-model = moss.Model(
-    shader = shader,
-    filePath = os.path.join(os.path.split(moss.__file__)[0], "res/deagle.obj")
-)
+    light.transform.position = glm.vec3(5.0, 5.0, 5.0)
+    light.transform.scaleVector = glm.vec3(0.1, 0.1, 0.1)
 
-model.transform.scale(glm.vec3(0.3, 0.3, 0.3))
-deagle_sound = mixer.load(os.path.join(os.path.split(moss.__file__)[0], "res/deagle.mp3"))
+    model = moss.Model(
+        shader = shader,
+        filePath = os.path.join(os.path.split(moss.__file__)[0], "res/deagle.obj")
+    )
 
-mesh = "Barrel_Lowpoly_Mesh"
-model.meshes[mesh].transform = moss.Transform()
-barrel_pos = glm.vec3(0.0, 0.0, 0.0)
-gun_std_pos, gun_pos = glm.vec3(0.0, -0.1, 0.15), glm.vec3(0.0, 0.0, 0.0)
-gun_std_rot, gun_rot = glm.vec3(-75.0, 180.0, -7.5), glm.vec3(0.0, 0.0, 0.0)
-state = True
+    model.transform.scale(glm.vec3(0.3, 0.3, 0.3))
+    deagle_sound = mixer.load(os.path.join(os.path.split(moss.__file__)[0], "res/deagle.mp3"))
 
-rvr.RVRInit()
-rvr.RVRSetupStereoRenderTargets()
-rvr.RVRInitControllers()
-rvr.RVRInitEyes(near, far)
+    mesh = "Barrel_Lowpoly_Mesh"
+    model.meshes[mesh].transform = moss.Transform()
+    barrel_pos = glm.vec3(0.0, 0.0, 0.0)
+    gun_std_pos, gun_pos = glm.vec3(0.0, -0.1, 0.15), glm.vec3(0.0, 0.0, 0.0)
+    gun_std_rot, gun_rot = glm.vec3(-75.0, 180.0, -7.5), glm.vec3(0.0, 0.0, 0.0)
+    state = True
 
-@window.event
+    rvr.RVRInit()
+    rvr.RVRSetupStereoRenderTargets()
+    rvr.RVRInitControllers()
+    rvr.RVRInitEyes(near, far)
+
 def update(window):
     global barrel_pos, gun_pos, gun_rot, state, gun_std_pos, gun_std_rot, position
 
@@ -117,12 +123,11 @@ def update(window):
         shader.setUniformMatrix4fv("view", moss.valptr(mat))
         shader.unuse()
 
-        lightShader.use()
-        lightShader.setUniform4fv("color", glm.value_ptr(glm.vec4(1.0, 1.0, 1.0, 1.0)))
-        lightShader.setUniform3fv("cameraPosition", glm.value_ptr(glm.vec3(0.0, 0.0, 0.0)))
-        lightShader.setUniformMatrix4fv("proj", rvr.RVRGetCurrentViewProjectionNoPoseMatrix(eye).value)
-        lightShader.setUniformMatrix4fv("view", moss.valptr(mat))
-        lightShader.unuse()
+        basicShader.use()
+        basicShader.setUniform3fv("albedoDefault", glm.value_ptr(glm.vec3(1.0, 1.0, 1.0)))
+        basicShader.setUniformMatrix4fv("proj", rvr.RVRGetCurrentViewProjectionNoPoseMatrix(eye).value)
+        basicShader.setUniformMatrix4fv("view", moss.valptr(mat))
+        basicShader.unuse()
 
         model.render()
         light.render()
@@ -137,12 +142,20 @@ def update(window):
     model.transform.position = gun_std_pos + gun_pos
     model.transform.rotation = gun_std_rot + gun_rot
 
-@window.event
 def exit(window):
     model.delete()
     shader.delete()
-    lightShader.delete()
+    basicShader.delete()
     rvr.RVRShutdown()
     rvr.RVRDeleteFramebufferDescriptors()
 
-moss.run()
+def main(argv):
+    window = moss.Window("VR Test", 1200, 600, moss.Color(0, 0, 0), False, 1)
+    window.event(setup)
+    window.event(update)
+    window.event(exit)
+    moss.run()
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

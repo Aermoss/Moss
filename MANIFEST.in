@@ -1,3 +1,11 @@
 include moss/*
 include moss/shaders/*
 include moss/res/*
+include moss/res/hdr_textures/*
+include moss/res/gold_scuffed/*
+include moss/res/copper_scuffed/*
+include moss/res/titanium_scuffed/*
+include moss/res/aluminum_scuffed/*
+include moss/res/iron_scuffed/*
+include moss/res/rusted_iron/*
+include moss/api/*

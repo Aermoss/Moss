@@ -84,8 +84,8 @@ def setup(window):
     gun = Gun(shader, camera, mixer)
 
     lightShader = moss.Shader(
-        moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/light.vert")),
-        moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/light.frag"))
+        moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/default.vert")),
+        moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/basic.frag"))
     )
 
     light = moss.Model(
@@ -106,6 +106,7 @@ def update(window):
     global shader, lightShader, state
 
     camera.proccessInputs()
+    gun.update()
 
     if window.input.getKey(moss.glfw.KEY_R):
         if state:
@@ -123,7 +124,6 @@ def update(window):
                 moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/light.frag"))
             )
 
-            gun.shader = shader
             model.shader = shader
             light.shader = lightShader
             state = False
@@ -137,7 +137,6 @@ def update(window):
     model.transform.pivotz = model.transform.position
     model.transform.rotate(glm.vec3(0.05, 0.1, 0.02))
 
-    gun.update()
     window.clear()
 
     for i in [shader, lightShader]:
@@ -156,7 +155,7 @@ def update(window):
     shader.unuse()
 
     lightShader.use()
-    lightShader.setUniform4fv("color", glm.value_ptr(glm.vec4(1.0, 1.0, 1.0, 1.0)))
+    lightShader.setUniform3fv("albedoDefault", glm.value_ptr(glm.vec3(1.0, 1.0, 1.0)))
     lightShader.unuse()
 
     gun.render()
@@ -164,14 +163,13 @@ def update(window):
     light.render()
 
 def exit(window):
-    gun.delete()
     model.delete()
     shader.delete()
     lightShader.delete()
 
 def main(argv):
     global window, popup
-    window = moss.Window("Moss Window", 1920, 1080, moss.Color(0, 0, 0), True, 16)
+    window = moss.Window("Gun Test", 1920, 1080, moss.Color(0, 0, 0), True, 16)
     window.event(setup)
     window.event(update)
     window.event(exit)

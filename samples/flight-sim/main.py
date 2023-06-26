@@ -72,7 +72,7 @@ class Light(moss.Model):
         self.depthShader.setUniform3fv("lightPosition", glm.value_ptr(self.transform.position))
 
         self.lightShader.use()
-        self.lightShader.setUniform4fv("color", glm.value_ptr(glm.vec4(1.0, 1.0, 1.0, 1.0)))
+        self.lightShader.setUniform3fv("albedoDefault", glm.value_ptr(glm.vec3(1.0, 1.0, 1.0)))
         self.lightShader.unuse()
 
     def end(self):
@@ -184,13 +184,13 @@ class App:
             moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/default.frag"))
         )
 
-        self.lightShader = moss.Shader(
-            moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/light.vert")),
-            moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/light.frag"))
+        self.basicShader = moss.Shader(
+            moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/default.vert")),
+            moss.readFile(os.path.join(os.path.split(moss.__file__)[0], "shaders/basic.frag"))
         )
 
         self.lights = [
-            Light(self.lightShader, glm.vec3(0.0, 0.0, 0.0), 1000.0, glm.vec3(1.0, 1.0, 1.0))
+            Light(self.basicShader, glm.vec3(0.0, 0.0, 0.0), 1000.0, glm.vec3(1.0, 1.0, 1.0))
         ]
 
         self.tpsCamera = moss.TPSCamera(
@@ -211,8 +211,8 @@ class App:
 
         self.ground.transform.scale(glm.vec3(scale, 1.0, scale))
 
-        falconModel = moss.loadOBJ("res/falcon.obj")
-        privateJetModel = moss.loadOBJ("res/jet.obj")
+        falconModel = moss.loadOBJ(self.shader, "res/falcon.obj")
+        privateJetModel = moss.loadOBJ(self.shader, "res/jet.obj")
 
         self.airplane = Falcon(self.shader, falconModel)
         self.airplane.engine.throttle = 1.0
@@ -220,8 +220,8 @@ class App:
         self.airplane.velocity = glm.vec3(phi.metersPerSecond(500.0), 0.0, 0.0)
 
         for i in self.airplane.meshes:
-            for j in self.airplane.meshes[i].parts:
-                self.airplane.meshes[i].parts[j]["cullFace"] = False
+            for j in self.airplane.meshes[i].submeshes:
+                self.airplane.meshes[i].submeshes[j]["cullFace"] = False
 
         self.npcs = []
         self.npcCount = 0
@@ -249,7 +249,7 @@ class App:
         self.state = True
 
     def update(self, window):
-        self.ground.materials[None]["albedo"] = glm.vec3(1.0)
+        self.ground.materials[None].albedo = glm.vec3(1.0)
         self.camera.fov = glm.clamp(phi.kilometersPerHour(self.airplane.getSpeed()) / 10, 90, 110)
 
         if self.window.input.getKey(moss.KEY_A): self.aileron = self.move(self.aileron, self.factor.x)
@@ -305,7 +305,7 @@ class App:
         self.window.clear()
         self.updateLights()
 
-        for i in [self.shader, self.lightShader]:
+        for i in [self.shader, self.basicShader]:
             for camera in [self.tpsCamera] if self.tpsCameraEnabled else [self.camera]:
                 camera.shader = i
                 camera.updateMatrices()
@@ -381,7 +381,7 @@ class App:
             i.delete()
 
         self.shader.delete()
-        self.lightShader.delete()
+        self.basicShader.delete()
 
     def run(self):
         moss.run()

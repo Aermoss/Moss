@@ -12,7 +12,12 @@ setup(
     name = "moss-engine",
     packages = ["moss"],
     version = moss.__version__,
-    entry_points = {},
+    entry_points = {
+        "console_scripts": [
+            "moss-editor = moss.editor:main",
+            "moss-run = moss.project:main"
+        ]
+    },
     description = long_desc.split("\n")[1],
     long_description = long_desc,
     long_description_content_type = "text/markdown",
