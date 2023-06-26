@@ -1,23 +1,24 @@
 import moss, glm, os, ctypes
 
-def loadMTL(filePath):
+def loadMTL(shader, filePath):
     materials, current = {}, ""
     names = {
         "illumination": (["illum"], int),
-        "roughness": (["Ns"], float),
+        "roughness": (["Pr", "Ns"], float),
+        "metallic": (["Pm"], float),
         "albedo": (["Kd"], glm.vec3),
         "ambient": (["Ka"], glm.vec3),
         "specular": (["Ks"], glm.vec3),
         "emission": (["Ke"], glm.vec3),
         "dissolve": (["d"], float),
-        "roughnessMap": (["map_Ns"], str),
+        "roughnessMap": (["map_Pr", "map_Ns"], str),
         "albedoMap": (["map_Kd"], str),
         "specularMap": (["map_Ks"], str),
         "ambientMap": (["map_Ka"], str),
         "dissolveMap": (["map_d"], str),
         "normalMap": (["map_Bump", "map_bump", "bump"], str),
         "emissionMap": (["map_Ke"], str),
-        "metallicMap": (["map_refl", "refl"], str)
+        "metallicMap": (["map_refl", "refl", "map_Pm"], str)
     }
 
     attributes = {}
@@ -31,26 +32,25 @@ def loadMTL(filePath):
 
         if values[0] == "newmtl":
             current = values[1]
-            materials[current] = {}
+            materials[current] = moss.Material(shader)
 
         elif values[0] in attributes:
             if attributes[values[0]][1] == str:
-                materials[current][attributes[values[0]][0]] = os.path.join(os.path.split(filePath)[0], " ".join(values[1:]))
+                setattr(materials[current], attributes[values[0]][0], os.path.join(os.path.split(filePath)[0], " ".join(values[1:])))
 
             if attributes[values[0]][1] == float:
-                materials[current][attributes[values[0]][0]] = float(values[1])
+                setattr(materials[current], attributes[values[0]][0], float(values[1]) / 1000 if attributes[values[0]][0] == "roughness" else float(values[1]))
 
             if attributes[values[0]][1] == glm.vec3:
-                materials[current][attributes[values[0]][0]] = glm.vec3(*[float(i) for i in values[1:]])
+                setattr(materials[current], attributes[values[0]][0], glm.vec3(*[float(i) for i in values[1:]]))
 
+    for i in materials:
+        materials[i].update()
+
+    moss.logger.log(moss.INFO, f"loaded MTL file: \"{os.path.split(filePath)[1]}\".")
     return materials
 
-default_material = {
-    "roughness": 100.0,
-    "albedo": glm.vec3(1.0, 1.0, 1.0),
-}
-    
-def loadOBJ(filePath):
+def loadOBJ(shader, filePath):
     materials, meshes, data = {}, {}, {"v": [], "vt": [], "vn": []}
     current_mesh, current_material = None, None
 
@@ -65,7 +65,7 @@ def loadOBJ(filePath):
                 meshes[None] = {}
 
             if current_material == None and current_material not in materials:
-                materials[current_material] = default_material
+                materials[current_material] = moss.Material(shader)
 
             if current_material not in meshes[current_mesh]:
                 meshes[current_mesh][current_material] = []
@@ -92,7 +92,7 @@ def loadOBJ(filePath):
                 i += 1
 
         elif values[0] == "mtllib":
-            materials = loadMTL(os.path.join(os.path.split(filePath)[0], " ".join(values[1:])))
+            materials = loadMTL(shader, os.path.join(os.path.split(filePath)[0], " ".join(values[1:])))
 
         elif values[0] == "usemtl":
             if current_mesh == "":
@@ -110,5 +110,6 @@ def loadOBJ(filePath):
     for mesh in meshes:
         for material in meshes[mesh]:
             meshes[mesh][material] = moss.mkarr(ctypes.c_float, meshes[mesh][material])
-
+    
+    moss.logger.log(moss.INFO, f"loaded OBJ file: \"{os.path.split(filePath)[1]}\".")
     return meshes, materials

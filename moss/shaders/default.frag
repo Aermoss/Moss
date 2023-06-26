@@ -10,14 +10,10 @@ in DATA {
     mat4 model;
 } data_in;
 
-uniform int enableShadows;
-
-uniform sampler2D normalMap;
-uniform int useNormalMap;
-
 uniform sampler2D albedoMap;
 uniform sampler2D metallicMap;
 uniform sampler2D roughnessMap;
+uniform sampler2D normalMap;
 uniform sampler2D ambientMap;
 uniform sampler2D specularMap;
 
@@ -29,6 +25,7 @@ uniform float ambientDefault;
 uniform int useAlbedoMap;
 uniform int useRoughnessMap;
 uniform int useMetallicMap;
+uniform int useNormalMap;
 uniform int useAmbientMap;
 uniform int useSpecularMap;
 
@@ -37,7 +34,13 @@ uniform int lightCount;
 uniform vec3 lightPositions[MAX_LIGHTS];
 uniform vec3 lightColors[MAX_LIGHTS];
 uniform float lightBrightnesses[MAX_LIGHTS];
+
+uniform int enableIBL;
+uniform int enableShadows;
 uniform samplerCube depthMap;
+uniform samplerCube irradianceMap;
+uniform samplerCube prefilterMap;
+uniform sampler2D brdfLUT;
 
 const float PI = 3.14159265359f;
 
@@ -59,8 +62,12 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
            geometrySchlickGGX(max(dot(N, V), 0.0f), roughness);
 }
 
-vec3 fresnelSchlick (float cosTheta, vec3 F0){
-    return F0 + (1.0f - F0) * pow(1.0f - cosTheta, 5.0f);
+vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+    return F0 + (1.0f - F0) * pow(clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
+}
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0f - roughness), F0) - F0) * pow(clamp(1.0f - cosTheta, 0.0f, 1.0f), 5.0f);
 }
 
 vec3 getNormalFromMap() {
@@ -80,11 +87,11 @@ vec3 getNormalFromMap() {
 }
 
 vec3 gridSamplingDisk[20] = vec3[](
-   vec3(1, 1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1, 1,  1), 
-   vec3(1, 1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1, 1, -1),
-   vec3(1, 1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1, 1,  0),
-   vec3(1, 0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1, 0, -1),
-   vec3(0, 1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0, 1, -1)
+   vec3(1.0f, 1.0f,  1.0f), vec3( 1.0f, -1.0f,  1.0f), vec3(-1.0f, -1.0f,  1.0f), vec3(-1.0f, 1.0f,  1.0f), 
+   vec3(1.0f, 1.0f, -1.0f), vec3( 1.0f, -1.0f, -1.0f), vec3(-1.0f, -1.0f, -1.0f), vec3(-1.0f, 1.0f, -1.0f),
+   vec3(1.0f, 1.0f,  0.0f), vec3( 1.0f, -1.0f,  0.0f), vec3(-1.0f, -1.0f,  0.0f), vec3(-1.0f, 1.0f,  0.0f),
+   vec3(1.0f, 0.0f,  1.0f), vec3(-1.0f,  0.0f,  1.0f), vec3( 1.0f,  0.0f, -1.0f), vec3(-1.0f, 0.0f, -1.0f),
+   vec3(0.0f, 1.0f,  1.0f), vec3( 0.0f, -1.0f,  1.0f), vec3( 0.0f, -1.0f, -1.0f), vec3( 0.0f, 1.0f, -1.0f)
 );
 
 float far_plane = 1000.0f;
@@ -120,8 +127,8 @@ void main() {
     if (useAlbedoMap == 1)
         albedo = pow(texture(albedoMap, data_in.texCoord), vec4(2.2f));
 
-    // if (useMetallicMap == 1)
-    //     metallic = texture(metallicMap, data_in.texCoord).r;
+    if (useMetallicMap == 1 && enableIBL == 1)
+        metallic = texture(metallicMap, data_in.texCoord).r;
 
     if (useRoughnessMap == 1)
         roughness = texture(roughnessMap, data_in.texCoord).r;
@@ -132,23 +139,15 @@ void main() {
     if (albedo.a < 0.1f)
         discard;
 
-    /* if (length(data_in.cameraPosition - data_in.position) > 30) {
-        vec3 ambient = vec3(6.0f) * albedo * ao;
-        vec3 color = ambient;
-        color = color / (color + vec3(1.0f));
-        color = pow(color, vec3(1.0f / 2.2f));
-        gl_FragColor = vec4(color, 1.0f);
-        return;
-    } */
-
     vec3 N = normalize(data_in.normal);
 
     if (useNormalMap == 1)
         N = getNormalFromMap();
 
     vec3 V = normalize(data_in.cameraPosition - data_in.position);
+    vec3 R = reflect(-V, N);
 
-    vec3 F0 = vec3(0.04f);
+    vec3 F0 = vec3(0.04f); 
     F0 = mix(F0, vec3(albedo), metallic);
     vec3 Lo = vec3(0.0f);
 
@@ -158,27 +157,38 @@ void main() {
         float distance = length(lightPositions[i] - data_in.position);
         float attenuation = (lightBrightnesses[i] * 100.0f) / (distance * distance);
         vec3 radiance = lightColors[i] * attenuation;
-
         float NDF = distributionGGX(N, H, roughness);
         float G = geometrySmith(N, V, L, roughness);
         vec3 F = fresnelSchlick(max(dot(H, V), 0.0f), F0);
-
-        vec3 kS = F;
-        vec3 kD = vec3(1.0f) - kS;
-        kD *= 1.0f - metallic;
-
         vec3 numerator = NDF * G * F;
         float denominator = 4.0f * max(dot(N, V), 0.0f) * max(dot(N, L), 0.0f) + 0.0001f;
         vec3 specular = numerator / denominator;
-
+        vec3 kS = F;
+        vec3 kD = vec3(1.0f) - kS;
+        kD *= 1.0f - metallic;
         float NdotL = max(dot(N, L), 0.0f);
         float shadow = shadowCalculation(i);
-        Lo += (kD * (1.0f - shadow) * (vec3(albedo) / PI + specular)) * radiance * NdotL;
+        Lo += (kD * vec3(albedo) / PI + specular) * (1.0f - shadow) * radiance * NdotL;
+    }
+     
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0f), F0, roughness);
+    vec3 kS = F;
+    vec3 kD = 1.0f - kS;
+    kD *= 1.0f - metallic;
+    vec3 diffuse = vec3(albedo);
+    vec3 specular = vec3(0.0f);
+
+    if (enableIBL == 1) {
+        vec3 irradiance = texture(irradianceMap, N).rgb;
+        diffuse = irradiance * diffuse;
+        const float MAX_REFLECTION_LOD = 4.0;
+        vec3 prefilteredColor = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
+        vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0f), roughness)).rg;
+        specular = prefilteredColor * (F * brdf.x + brdf.y);
     }
 
-    vec3 ambient = vec3(0.3f) * vec3(albedo) * ao;
+    vec3 ambient = (kD * diffuse + specular) * ao;
     vec3 color = ambient + Lo;
-
     color = color / (color + vec3(1.0f));
     color = pow(color, vec3(1.0f / 2.2f)); 
     gl_FragColor = vec4(color, 1.0f);

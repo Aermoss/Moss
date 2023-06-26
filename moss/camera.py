@@ -19,6 +19,8 @@ class Camera:
         self.view = glm.lookAt(self.position, self.position + self.front, self.up)
 
     def updateMatrices(self):
+        if self.window.width == 0: return
+        
         self.proj = glm.perspective(glm.radians(self.fov), self.window.width / self.window.height, self.near, self.far)
         self.shader.use()
         self.shader.setUniform3fv("cameraPosition", glm.value_ptr(self.position))
@@ -36,6 +38,8 @@ class TPSCamera:
         self.yaw, self.pitch = 0.0, 0.0
 
     def proccessInputs(self):
+        if self.window.width == 0: return
+
         self.window.input.setCursorVisible(False)
         x, y = self.window.input.getCursorPosition()
 
@@ -84,6 +88,8 @@ class FPSCamera:
         self.yaw, self.pitch = 0.0, 0.0
 
     def proccessInputs(self):
+        if self.window.width == 0: return
+
         if self.window.input.getKey(moss.KEY_LEFT_CONTROL):
             self.speed = self.sprintSpeed
 
@@ -154,6 +160,8 @@ class FreeCamera:
         self.yaw, self.pitch = 0.0, 0.0
 
     def proccessInputs(self):
+        if self.window.width == 0: return
+
         if self.window.input.getKey(moss.KEY_LEFT_CONTROL):
             self.speed = self.sprintSpeed
 
@@ -225,6 +233,8 @@ class EditorCamera:
         self.yaw, self.pitch = 0.0, 0.0
 
     def proccessInputs(self):
+        if self.window.width == 0: return
+        
         if not self.window.input.getMouseButton(moss.MOUSE_BUTTON_RIGHT):
             self.window.input.setCursorVisible(True)
             self.enabled = False
@@ -245,7 +255,7 @@ class EditorCamera:
             self.speed = self.normalSpeed
 
         if self.window.input.scrollY != self.lastScroll:
-            self.position += (self.window.input.scrollY - self.lastScroll) * self.speed * 100 * self.front
+            self.position += (self.window.input.scrollY - self.lastScroll) * self.speed * 10 * self.front
             self.lastScroll = self.window.input.scrollY
 
         if self.window.input.getKey(moss.KEY_W):
@@ -290,7 +300,7 @@ class EditorCamera:
         ))
 
         proj = glm.perspective(glm.radians(self.fov), self.window.width / self.window.height, self.near, self.far)
-        view = glm.lookAt(self.position, self.position + self.front, self.up)
+        view = glm.lookAt(self.position, self.position + self.front, glm.vec3(0.0, self.up.y * math.cos(45.0), 0.0))
         self.shader.use()
         self.shader.setUniform3fv("cameraPosition", glm.value_ptr(self.position))
         self.shader.setUniformMatrix4fv("proj", glm.value_ptr(proj))

@@ -1,4 +1,4 @@
-import moss, sdl2, sdl2.ext, sdl2.sdlmixer
+import moss, sdl2, sdl2.ext, sdl2.sdlmixer, os
 
 class Mixer:
     def __init__(self):
@@ -7,6 +7,7 @@ class Mixer:
         self.channels = []
 
     def load(self, file):
+        moss.logger.log(moss.INFO, f"loaded audio file: \"{os.path.split(file)[1]}\".")
         return sdl2.sdlmixer.Mix_LoadWAV(file.encode())
 
     def play(self, sound, volume = 255, loop = 0):
