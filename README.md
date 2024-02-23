@@ -1,5 +1,5 @@
 # Moss Engine
-A 3D game engine written in Python using OpenGL.
+A game engine written in Python using OpenGL.
 
 ## Screenshots
 ![screenshot0](screenshots/screenshot0.png)  
